@@ -244,6 +244,159 @@ int display() {
     return OK;
 }
 
+/* --------------- 启动界面（极简深色代码编辑器） --------------- */
+
+#define LOGO_LETTERS 6
+#define LOGO_ROWS 6
+#define LOGO_COLS 8
+
+enum {
+    CP_VAR = 1,
+    CP_OP,
+    CP_PREFIX,
+    CP_QUOTE,
+    CP_PROMPT,
+    CP_L1,
+    CP_L2,
+    CP_L3,
+    CP_L4,
+    CP_L5,
+    CP_L6
+};
+
+// figlet standard 字体拼出的 TETRIS
+static const char* const logo_banner[LOGO_LETTERS][LOGO_ROWS] = {
+    { // T
+        " _____  ",
+        "|_   _| ",
+        "  | |   ",
+        "  | |   ",
+        "  | |   ",
+        "  |_|   "
+    },
+    { // E
+        " _____  ",
+        "| ____| ",
+        "|  _|   ",
+        "| |___  ",
+        "|_____| ",
+        "        "
+    },
+    { // T
+        " _____  ",
+        "|_   _| ",
+        "  | |   ",
+        "  | |   ",
+        "  | |   ",
+        "  |_|   "
+    },
+    { // R
+        " ____   ",
+        "|  _ \\  ",
+        "| |_) | ",
+        "|  _ <  ",
+        "|_| \\_\\ ",
+        "        "
+    },
+    { // I
+        " ___    ",
+        "|_ _|   ",
+        " | |    ",
+        " | |    ",
+        "|___|    ",
+        "        "
+    },
+    { // S
+        " ____   ",
+        "/ ___|  ",
+        "\\___ \\  ",
+        " ___) | ",
+        "|____/  ",
+        "        "
+    }
+};
+
+// 六个字母的亮度：低饱和为主，蓝/红稍亮以免看不清
+static const int logo_attr[LOGO_LETTERS] = {
+    A_DIM,  // 青
+    A_BOLD, // 浅绿
+    A_DIM,  // 暖黄
+    A_DIM,  // 淡紫
+    A_BOLD, // 浅蓝
+    A_BOLD  // 鲑红
+};
+
+static void init_editor_colors(void) {
+    if (!has_colors()) return;
+
+    start_color();
+    init_pair(CP_VAR, COLOR_RED, COLOR_BLACK);
+    init_pair(CP_OP, COLOR_CYAN, COLOR_BLACK);
+    init_pair(CP_PREFIX, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_QUOTE, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_PROMPT, COLOR_WHITE, COLOR_BLACK);
+    init_pair(CP_L1, COLOR_CYAN, COLOR_BLACK);
+    init_pair(CP_L2, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_L3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(CP_L4, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(CP_L5, COLOR_BLUE, COLOR_BLACK);
+    init_pair(CP_L6, COLOR_RED, COLOR_BLACK);
+}
+
+static void draw_code_line(int y, int x, const char* text, int pair, int attr) {
+    if (y < 0 || y >= window_height) return;
+
+    chtype a = COLOR_PAIR(pair) | attr;
+    attron(a);
+    mvaddstr(y, x, text);
+    attroff(a);
+}
+
+// 按任意键进入游戏
+void start_screen(void) {
+    static const char* const prompt = "Press any key to enter the game";
+    int logo_w = LOGO_LETTERS * LOGO_COLS;
+    int total_h = LOGO_ROWS + 5; // 首行 + 空行 + 字标 + 空行 + 提示 + 收尾
+
+    int x0 = (window_width - logo_w) / 2;
+    if (x0 < 2) x0 = 2;
+    int y0 = (window_height - total_h) / 2;
+    if (y0 < 1) y0 = 1;
+
+    int blink = 0;
+    while (1) {
+        erase();
+
+        // 字标
+        for (int r = 0; r < LOGO_ROWS; r++) {
+            int x = x0;
+            for (int l = 0; l < LOGO_LETTERS; l++) {
+                draw_code_line(y0 + 2 + r, x, logo_banner[l][r], CP_L1 + l, logo_attr[l]);
+                x += LOGO_COLS;
+            }
+        }
+
+        // 提示行 + 方块光标
+        int py = y0 + 2 + LOGO_ROWS + 1;
+        draw_code_line(py, x0, prompt, CP_PROMPT, A_DIM);
+        if (blink) {
+            attron(A_REVERSE);
+            mvaddch(py, x0 + (int)strlen(prompt), ' ');
+            attroff(A_REVERSE);
+        }
+
+        move(window_height - 1, window_width - 1);
+        refresh();
+
+        timeout(500);
+        if (getch() != ERR) break;
+        blink = !blink;
+    }
+
+    timeout(KEY_TIMEOUT);
+    attrset(A_NORMAL);
+}
+
 void loop() {
     int piece_idx = rand() % PIECES_NUM;
     int x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
@@ -337,203 +490,6 @@ void loop() {
     }
 }
 
-/* ---------------- 启动界面（复古街机 / CRT 质感） ---------------- */
-
-#define LOGO_W 5      // 字标每格 5 像素宽
-#define LOGO_H 5      // 字标每格 5 像素高
-#define BLOCK_W 2     // 每个方块在终端里占 2 列，视觉上接近正方形
-#define LOGO_COUNT 6
-#define LOGO_GAP 1
-
-#define GHOST_COUNT 8
-#define GHOST_SHAPE_NUM 7
-#define GHOST_SIZE 4
-
-// 七种经典方块色 + 文字色、暗色
-enum {
-    PAIR_CYAN = 1,
-    PAIR_YELLOW,
-    PAIR_PURPLE,
-    PAIR_GREEN,
-    PAIR_RED,
-    PAIR_BLUE,
-    PAIR_ORANGE,
-    PAIR_TEXT,
-    PAIR_DIM
-};
-
-// T E T R I S 的 5x5 点阵
-static const char* const logo_letters[LOGO_COUNT][LOGO_H] = {
-    { "#####", "  #  ", "  #  ", "  #  ", "  #  " }, // T
-    { "#####", "#    ", "#### ", "#    ", "#####" }, // E
-    { "#####", "  #  ", "  #  ", "  #  ", "  #  " }, // T
-    { "#### ", "#   #", "#### ", "#  # ", "#   #" }, // R
-    { "#####", "  #  ", "  #  ", "  #  ", "#####" }, // I
-    { " ####", "#    ", " ### ", "    #", "#### " }  // S
-};
-
-// 背景残影用的四种块
-static const char* const ghost_shapes[GHOST_SHAPE_NUM][GHOST_SIZE] = {
-    { "####", "    ", "    ", "    " }, // I
-    { "##  ", "##  ", "    ", "    " }, // O
-    { "### ", " #  ", "    ", "    " }, // T
-    { " ## ", "##  ", "    ", "    " }, // S
-    { "##  ", " ## ", "    ", "    " }, // Z
-    { "#   ", "### ", "    ", "    " }, // J
-    { "  # ", "### ", "    ", "    " }  // L
-};
-
-static struct {
-    int shape, x, y;
-} ghosts[GHOST_COUNT];
-
-static void init_colors(void) {
-    if (!has_colors()) return;
-
-    start_color();
-    init_pair(PAIR_CYAN, COLOR_CYAN, COLOR_BLACK);
-    init_pair(PAIR_YELLOW, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(PAIR_PURPLE, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(PAIR_GREEN, COLOR_GREEN, COLOR_BLACK);
-    init_pair(PAIR_RED, COLOR_RED, COLOR_BLACK);
-    init_pair(PAIR_BLUE, COLOR_BLUE, COLOR_BLACK);
-    init_pair(PAIR_ORANGE, COLOR_YELLOW, COLOR_BLACK); // 终端无橙色，用亮黄近似
-    init_pair(PAIR_TEXT, COLOR_WHITE, COLOR_BLACK);
-    init_pair(PAIR_DIM, COLOR_BLUE, COLOR_BLACK);
-}
-
-// 扫描线 + 暗角
-static void draw_crt_bg(void) {
-    for (int y = 1; y < window_height; y += 2) {
-        for (int x = 0; x < window_width; x++) {
-            mvaddch(y, x, ACS_HLINE | A_DIM | COLOR_PAIR(PAIR_DIM));
-        }
-    }
-
-    for (int y = 0; y < window_height; y++) {
-        mvaddch(y, 0, ACS_VLINE | A_DIM | COLOR_PAIR(PAIR_DIM));
-        mvaddch(y, window_width - 1, ACS_VLINE | A_DIM | COLOR_PAIR(PAIR_DIM));
-    }
-    for (int x = 0; x < window_width; x++) {
-        mvaddch(0, x, ACS_HLINE | A_DIM | COLOR_PAIR(PAIR_DIM));
-        mvaddch(window_height - 1, x, ACS_HLINE | A_DIM | COLOR_PAIR(PAIR_DIM));
-    }
-}
-
-static void init_ghosts(void) {
-    int max_x = window_width / BLOCK_W - GHOST_SIZE;
-    if (max_x < 1) max_x = 1;
-
-    for (int i = 0; i < GHOST_COUNT; i++) {
-        ghosts[i].shape = rand() % GHOST_SHAPE_NUM;
-        ghosts[i].x = rand() % max_x;
-        ghosts[i].y = rand() % (window_height + GHOST_SIZE) - GHOST_SIZE;
-    }
-}
-
-static void draw_ghosts(void) {
-    for (int i = 0; i < GHOST_COUNT; i++) {
-        for (int r = 0; r < GHOST_SIZE; r++) {
-            int sy = ghosts[i].y + r;
-            if (sy < 0 || sy >= window_height) continue;
-
-            for (int c = 0; c < GHOST_SIZE; c++) {
-                if (ghost_shapes[ghosts[i].shape][r][c] != '#') continue;
-
-                int sx = (ghosts[i].x + c) * BLOCK_W;
-                if (sx < 0 || sx + 1 >= window_width) continue;
-
-                chtype attr = ' ' | A_REVERSE | A_DIM | COLOR_PAIR(PAIR_DIM);
-                mvaddch(sy, sx, attr);
-                mvaddch(sy, sx + 1, attr);
-            }
-        }
-    }
-}
-
-// 字标：mode 为 0 时用七色，否则整体用 mode 指定的颜色画淡影（色散）
-static void draw_logo(int y0, int x0, int mode) {
-    int x = x0;
-
-    for (int l = 0; l < LOGO_COUNT; l++) {
-        for (int r = 0; r < LOGO_H; r++) {
-            int sy = y0 + r;
-            if (sy < 0 || sy >= window_height) continue;
-
-            for (int c = 0; c < LOGO_W; c++) {
-                if (logo_letters[l][r][c] != '#') continue;
-
-                int sx = x + c * BLOCK_W;
-                if (sx < 0 || sx + 1 >= window_width) continue;
-
-                int color = mode ? mode : PAIR_CYAN + (l + r) % 7;
-                chtype attr = ' ' | A_REVERSE | COLOR_PAIR(color);
-                if (mode) attr |= A_DIM;
-                if (!mode && color == PAIR_ORANGE) attr |= A_BOLD; // 亮黄近似橙
-
-                mvaddch(sy, sx, attr);
-                mvaddch(sy, sx + 1, attr);
-            }
-        }
-
-        x += LOGO_W * BLOCK_W + LOGO_GAP;
-    }
-}
-
-// 启动界面：显示字标与提示，按任意键返回
-void start_screen(void) {
-    static const char* const prompt = "PRESS ANY KEY TO START";
-    int logo_width = LOGO_COUNT * LOGO_W * BLOCK_W + (LOGO_COUNT - 1) * LOGO_GAP;
-
-    int x0 = (window_width - logo_width) / 2;
-    int y0 = (window_height - LOGO_H) / 2 - 1;
-    if (x0 < 1) x0 = 1;
-    if (y0 < 1) y0 = 1;
-
-    init_ghosts();
-
-    int blink = 0;
-    while (1) {
-        erase();
-        draw_crt_bg();
-        draw_ghosts();
-
-        // 边缘轻微色散：先画偏移的淡影，再画主字标
-        draw_logo(y0, x0 - 1, PAIR_RED);
-        draw_logo(y0, x0 + 1, PAIR_BLUE);
-        draw_logo(y0, x0, 0);
-
-        int px = (window_width - (int)strlen(prompt)) / 2;
-        if (px < 0) px = 0;
-
-        chtype attr = COLOR_PAIR(PAIR_TEXT) | A_BOLD;
-        if (blink) attr |= A_REVERSE;
-        attron(attr);
-        mvprintw(y0 + LOGO_H + 2, px, "%s", prompt);
-        attroff(attr);
-
-        move(window_height - 1, window_width - 1);
-        refresh();
-
-        // 残影缓慢下落
-        for (int i = 0; i < GHOST_COUNT; i++) {
-            if (++ghosts[i].y > window_height) {
-                int max_x = window_width / BLOCK_W - GHOST_SIZE;
-                if (max_x < 1) max_x = 1;
-                ghosts[i].y = -GHOST_SIZE;
-                ghosts[i].x = rand() % max_x;
-                ghosts[i].shape = rand() % GHOST_SHAPE_NUM;
-            }
-        }
-
-        timeout(400);
-        if (getch() != ERR) break;
-        blink = !blink;
-    }
-
-    timeout(KEY_TIMEOUT);
-}
-
 int main(void) {
     // 初始化
     if (read_pieces("pieces.txt") != OK) {
@@ -556,9 +512,10 @@ int main(void) {
         return 1;
     }
 
-    init_colors();
+    init_editor_colors();
     start_screen();
     erase();
+    refresh();
 
     loop();
 
