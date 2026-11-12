@@ -6,16 +6,14 @@
 
 #define BOARD_WIDTH 20
 #define BOARD_HEIGHT 20
+#define BOARD_LEFT 1
+#define SIDEBAR_WIDTH 20
 
 #define PIECES_NUM 8
 #define PIECE_MAX_SIZE 4
 
 #define KEY_TIMEOUT 16
 #define DROP_INTERVAL 1
-
-#define BOARD_LEFT 1
-
-#define min(a, b) ((a) < (b) ? (a) : (b))
 
 int board[BOARD_HEIGHT][BOARD_WIDTH] = { 0 };
 int window_width, window_height;
@@ -205,11 +203,14 @@ void clear_full_rows() {
     }
 }
 
-// 两侧竖栏
-void draw_borders() {
+// 界面框架
+void draw_interface() {
     for (int i = 0; i < window_height; i++) {
+        // 两侧竖栏
         mvaddch(i, BOARD_LEFT - 1, ACS_VLINE);
         mvaddch(i, BOARD_LEFT + BOARD_WIDTH * 2, ACS_VLINE);
+        // 侧边栏
+        mvaddch(i, BOARD_LEFT + BOARD_WIDTH * 2 + SIDEBAR_WIDTH, ACS_VLINE);
     }
 }
 
@@ -218,8 +219,8 @@ int display() {
         for (int j = 0; j < BOARD_WIDTH; j++) {
             chtype cell = board[i][j] ? (' ' | A_REVERSE) : ' ';
 
-            if (mvaddch(i, BOARD_LEFT + j * 2, cell) == ERR) return ERR;
-            if (mvaddch(i, BOARD_LEFT + j * 2 + 1, cell) == ERR) return ERR;
+            if (mvaddch(i + window_height - BOARD_HEIGHT, BOARD_LEFT + j * 2, cell) == ERR) return ERR;
+            if (mvaddch(i + window_height - BOARD_HEIGHT, BOARD_LEFT + j * 2 + 1, cell) == ERR) return ERR;
         }
     }
     refresh();
@@ -236,8 +237,7 @@ void loop() {
     time_t last_time = time(NULL);
 
     while (1) {
-        // 两侧竖栏
-        draw_borders();
+        draw_interface();
 
         // 输入
         timeout(KEY_TIMEOUT);
@@ -325,7 +325,8 @@ int main(void) {
     getmaxyx(stdscr, window_height, window_width);
 
     // 窗口大小不足退出
-    if (window_width < (BOARD_WIDTH + 2) * 2 || window_height < BOARD_HEIGHT + 2) {
+    if (window_width < (BOARD_WIDTH + 2) * 2 + SIDEBAR_WIDTH
+        || window_height < BOARD_HEIGHT + 2) {
         endwin();
         printf("Window is too small!\n");
         return 1;
