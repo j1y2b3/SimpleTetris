@@ -77,14 +77,17 @@ int read_pieces(const char* file) {
 }
 
 void put_piece(struct Piece* piece, int x, int y, int color) {
-    for (int i = 0; i < piece->height; i++) {
-        if (y + i < 0 || BOARD_HEIGHT <= y + i) continue;
+    for (int i = piece->top; i < piece->top + piece->height; i++) {
+        int by = y + i - piece->top;
+        if (by < 0 || BOARD_HEIGHT <= by) continue;
 
-        for (int j = 0; j < piece->width; j++) {
-            if (x + j < 0 || BOARD_WIDTH <= x + j) continue;
-            if (!(piece->shape[i][j])) continue;
+        for (int j = piece->left; j < piece->left + piece->width; j++) {
+            if (!piece->shape[i][j]) continue;
 
-            board[y + i][x + j] = color;
+            int bx = x + j - piece->left;
+            if (bx < 0 || BOARD_WIDTH <= bx) continue;
+
+            board[by][bx] = color;
         }
     }
 }
@@ -130,12 +133,13 @@ void del_row(int row) {
 
 // 判断方块能否放在 (x, y)：不越界且不与已有方块重叠
 int can_place(struct Piece* piece, int x, int y) {
-    for (int i = 0; i < piece->height; i++) {
-        for (int j = 0; j < piece->width; j++) {
+    for (int i = piece->top; i < piece->top + piece->height; i++) {
+        int ny = y + i - piece->top;
+
+        for (int j = piece->left; j < piece->left + piece->width; j++) {
             if (!piece->shape[i][j]) continue;
 
-            int nx = x + j;
-            int ny = y + i;
+            int nx = x + j - piece->left;
             if (nx < 0 || BOARD_WIDTH <= nx) return 0;
             if (ny >= BOARD_HEIGHT) return 0;
             if (ny >= 0 && board[ny][nx]) return 0;
