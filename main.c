@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <windows.h>
 
 #define BOARD_WIDTH 20
 #define BOARD_HEIGHT 20
@@ -131,7 +132,9 @@ void del_row(int row) {
     for (int j = 0; j < BOARD_WIDTH; j++) {
         board[0][j] = 0;
     }
+    // 得分
     ++score;
+    PlaySound(TEXT("audio/getscore.wav"), NULL, SND_FILENAME | SND_ASYNC);
 }
 
 // 判断方块能否放在 (x, y)：不越界且不与已有方块重叠
@@ -302,6 +305,7 @@ void loop() {
 
                 // 新方块放不下则游戏结束
                 if (!can_place(&pieces[piece_idx], x, y)) {
+                    PlaySound(TEXT("audio/fail.wav"), NULL, SND_FILENAME | SND_ASYNC);
                     mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "GAME OVER");
                     mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
                     refresh();
@@ -316,6 +320,7 @@ void loop() {
         }
 
         if (score > MAX_SCORE) {
+            PlaySound(TEXT("audio/win.wav"), NULL, SND_FILENAME | SND_ASYNC);
             mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "YOU WIN");
             mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
             refresh();

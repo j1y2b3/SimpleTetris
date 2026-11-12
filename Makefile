@@ -42,4 +42,4 @@ pdcurses.a:
 		 PDCURSES_SRCDIR=$(abspath $(PDC_DIR)) WIDE=Y DLL=N
 
 $(TARGET): pdcurses.a
-	$(CC) main.c $(CFLAGS) $(abspath $(BUILD_DIR))/$(PDC_DIR)/pdcurses.a -o $@
+	$(CC) main.c $(CFLAGS) $(abspath $(BUILD_DIR))/$(PDC_DIR)/pdcurses.a -o $@ -lwinmm
