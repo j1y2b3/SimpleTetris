@@ -7,7 +7,7 @@
 #define BOARD_WIDTH 20
 #define BOARD_HEIGHT 20
 #define BOARD_LEFT 1
-#define SIDEBAR_WIDTH 20
+#define SIDEBAR_WIDTH 25
 
 #define PIECES_NUM 8
 #define PIECE_MAX_SIZE 4
@@ -15,8 +15,11 @@
 #define KEY_TIMEOUT 16
 #define DROP_INTERVAL 1
 
+#define MAX_SCORE 99
+
 int board[BOARD_HEIGHT][BOARD_WIDTH] = { 0 };
 int window_width, window_height;
+int score = 0;
 
 struct Piece {
     int shape[PIECE_MAX_SIZE][PIECE_MAX_SIZE];
@@ -128,6 +131,7 @@ void del_row(int row) {
     for (int j = 0; j < BOARD_WIDTH; j++) {
         board[0][j] = 0;
     }
+    ++score;
 }
 
 // 判断方块能否放在 (x, y)：不越界且不与已有方块重叠
@@ -212,6 +216,15 @@ void draw_interface() {
         // 侧边栏
         mvaddch(i, BOARD_LEFT + BOARD_WIDTH * 2 + SIDEBAR_WIDTH, ACS_VLINE);
     }
+    // 侧边栏内容
+    mvaddstr(0, BOARD_LEFT + BOARD_WIDTH * 2 + 1, "rotate: w/W/up ksy");
+    mvaddstr(1, BOARD_LEFT + BOARD_WIDTH * 2 + 1, "fast fall: s/S/down key");
+    mvaddstr(2, BOARD_LEFT + BOARD_WIDTH * 2 + 1, "right: d/D/right key");
+    mvaddstr(3, BOARD_LEFT + BOARD_WIDTH * 2 + 1, "left: a/A/left key");
+    mvaddstr(4, BOARD_LEFT + BOARD_WIDTH * 2 + 1, "quit: q/Q/esc");
+    char score_str[SIDEBAR_WIDTH + 1];
+    sprintf(score_str, "score: %d/%d", score, MAX_SCORE);
+    mvaddstr(5, BOARD_LEFT + BOARD_WIDTH * 2 + 1, score_str);
 }
 
 int display() {
@@ -302,10 +315,17 @@ void loop() {
             }
         }
 
+        if (score > MAX_SCORE) {
+            mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "YOU WIN");
+            mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
+            refresh();
+            timeout(-1);
+            getch();
+            return;
+        }
+
         // 显示
         display();
-        // 光标移至右下角
-        mvaddch(window_height - 1, window_width - 1, ' ');
         // 刷新
         refresh();
     }
@@ -320,6 +340,7 @@ int main(void) {
     srand((unsigned)time(NULL));
     initscr();
     noecho();
+    curs_set(0);
     cbreak();
     keypad(stdscr, TRUE);
     getmaxyx(stdscr, window_height, window_width);
