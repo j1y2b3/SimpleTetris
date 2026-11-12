@@ -9,6 +9,7 @@
 #define PIECES_NUM 1
 #define PIECE_MAX_SIZE 4
 
+#define KEY_TIMEOUT 16
 #define DROP_INTERVAL 1
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -150,6 +151,7 @@ void loop() {
         }
 
         // 输入
+        timeout(KEY_TIMEOUT);
         int input = getch();
         if (input != ERR) {
             ;
