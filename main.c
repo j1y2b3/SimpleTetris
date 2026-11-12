@@ -306,10 +306,12 @@ void loop() {
                 // 新方块放不下则游戏结束
                 if (!can_place(&pieces[piece_idx], x, y)) {
                     PlaySound(TEXT("audio/fail.wav"), NULL, SND_FILENAME | SND_ASYNC);
-                    mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "GAME OVER");
-                    mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
+                    clear();
+                    mvaddstr(0, 0, "GAME OVER");
+                    mvaddstr(1, 0, "Press any key to exit...");
                     refresh();
                     timeout(-1);
+                    Sleep(1000);
                     getch();
                     return;
                 }
@@ -321,10 +323,12 @@ void loop() {
 
         if (score > MAX_SCORE) {
             PlaySound(TEXT("audio/win.wav"), NULL, SND_FILENAME | SND_ASYNC);
-            mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "YOU WIN");
-            mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
+            clear();
+            mvaddstr(0, 0, "YOU WIN");
+            mvaddstr(2, 0, "Press any key to exit...");
             refresh();
             timeout(-1);
+            Sleep(1000);
             getch();
             return;
         }
