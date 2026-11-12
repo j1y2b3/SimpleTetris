@@ -158,6 +158,52 @@ void loop() {
         }
 
         // 下落
+        cur_time = time(NULL);
+        if (cur_time - last_time >= DROP_INTERVAL) {
+            last_time = cur_time;
+
+            // 当前方块状态（静态变量只初始化一次）
+            static int cur_piece = 0;
+            static int cur_x = 2, cur_y = 2;
+            static int spawned = 0;
+
+            if (!spawned) {
+                // 首次进入：在顶部生成方块
+                put_piece(&pieces[cur_piece], cur_x, cur_y, 1);
+                spawned = 1;
+            } else {
+                // 先擦除旧位置，再判断能否下移一格
+                put_piece(&pieces[cur_piece], cur_x, cur_y, 0);
+
+                int can_down = 1;
+                for (int i = 0; i < pieces[cur_piece].height; i++) {
+                    for (int j = 0; j < pieces[cur_piece].width; j++) {
+                        if (!pieces[cur_piece].shape[i][j]) continue;
+
+                        int nx = cur_x + j;
+                        int ny = cur_y + i + 1;
+                        // 越界或与已有方块重叠则不能下落
+                        if (nx < 0 || BOARD_WIDTH <= nx
+                                || ny < 0 || BOARD_HEIGHT <= ny
+                                || board[ny][nx]) {
+                            can_down = 0;
+                            break;
+                        }
+                    }
+                    if (!can_down) break;
+                }
+
+                if (can_down) {
+                    ++cur_y;  // 下落一格
+                }
+                // 在（新或原）位置重新画出方块
+                put_piece(&pieces[cur_piece], cur_x, cur_y, 1);
+            }
+        }
+    
+
+
+
 
 
         // 显示
