@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <windows.h>
 
@@ -243,6 +244,159 @@ int display() {
     return OK;
 }
 
+/* --------------- 启动界面（极简深色代码编辑器） --------------- */
+
+#define LOGO_LETTERS 6
+#define LOGO_ROWS 6
+#define LOGO_COLS 8
+
+enum {
+    CP_VAR = 1,
+    CP_OP,
+    CP_PREFIX,
+    CP_QUOTE,
+    CP_PROMPT,
+    CP_L1,
+    CP_L2,
+    CP_L3,
+    CP_L4,
+    CP_L5,
+    CP_L6
+};
+
+// figlet standard 字体拼出的 TETRIS
+static const char* const logo_banner[LOGO_LETTERS][LOGO_ROWS] = {
+    { // T
+        " _____  ",
+        "|_   _| ",
+        "  | |   ",
+        "  | |   ",
+        "  | |   ",
+        "  |_|   "
+    },
+    { // E
+        " _____  ",
+        "| ____| ",
+        "|  _|   ",
+        "| |___  ",
+        "|_____| ",
+        "        "
+    },
+    { // T
+        " _____  ",
+        "|_   _| ",
+        "  | |   ",
+        "  | |   ",
+        "  | |   ",
+        "  |_|   "
+    },
+    { // R
+        " ____   ",
+        "|  _ \\  ",
+        "| |_) | ",
+        "|  _ <  ",
+        "|_| \\_\\ ",
+        "        "
+    },
+    { // I
+        " ___    ",
+        "|_ _|   ",
+        " | |    ",
+        " | |    ",
+        "|___|    ",
+        "        "
+    },
+    { // S
+        " ____   ",
+        "/ ___|  ",
+        "\\___ \\  ",
+        " ___) | ",
+        "|____/  ",
+        "        "
+    }
+};
+
+// 六个字母的亮度：低饱和为主，蓝/红稍亮以免看不清
+static const int logo_attr[LOGO_LETTERS] = {
+    A_DIM,  // 青
+    A_BOLD, // 浅绿
+    A_DIM,  // 暖黄
+    A_DIM,  // 淡紫
+    A_BOLD, // 浅蓝
+    A_BOLD  // 鲑红
+};
+
+static void init_editor_colors(void) {
+    if (!has_colors()) return;
+
+    start_color();
+    init_pair(CP_VAR, COLOR_RED, COLOR_BLACK);
+    init_pair(CP_OP, COLOR_CYAN, COLOR_BLACK);
+    init_pair(CP_PREFIX, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_QUOTE, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_PROMPT, COLOR_WHITE, COLOR_BLACK);
+    init_pair(CP_L1, COLOR_CYAN, COLOR_BLACK);
+    init_pair(CP_L2, COLOR_GREEN, COLOR_BLACK);
+    init_pair(CP_L3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(CP_L4, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(CP_L5, COLOR_BLUE, COLOR_BLACK);
+    init_pair(CP_L6, COLOR_RED, COLOR_BLACK);
+}
+
+static void draw_code_line(int y, int x, const char* text, int pair, int attr) {
+    if (y < 0 || y >= window_height) return;
+
+    chtype a = COLOR_PAIR(pair) | attr;
+    attron(a);
+    mvaddstr(y, x, text);
+    attroff(a);
+}
+
+// 按任意键进入游戏
+void start_screen(void) {
+    static const char* const prompt = "Press any key to enter the game";
+    int logo_w = LOGO_LETTERS * LOGO_COLS;
+    int total_h = LOGO_ROWS + 5; // 首行 + 空行 + 字标 + 空行 + 提示 + 收尾
+
+    int x0 = (window_width - logo_w) / 2;
+    if (x0 < 2) x0 = 2;
+    int y0 = (window_height - total_h) / 2;
+    if (y0 < 1) y0 = 1;
+
+    int blink = 0;
+    while (1) {
+        erase();
+
+        // 字标
+        for (int r = 0; r < LOGO_ROWS; r++) {
+            int x = x0;
+            for (int l = 0; l < LOGO_LETTERS; l++) {
+                draw_code_line(y0 + 2 + r, x, logo_banner[l][r], CP_L1 + l, logo_attr[l]);
+                x += LOGO_COLS;
+            }
+        }
+
+        // 提示行 + 方块光标
+        int py = y0 + 2 + LOGO_ROWS + 1;
+        draw_code_line(py, x0, prompt, CP_PROMPT, A_DIM);
+        if (blink) {
+            attron(A_REVERSE);
+            mvaddch(py, x0 + (int)strlen(prompt), ' ');
+            attroff(A_REVERSE);
+        }
+
+        move(window_height - 1, window_width - 1);
+        refresh();
+
+        timeout(500);
+        if (getch() != ERR) break;
+        blink = !blink;
+    }
+
+    timeout(KEY_TIMEOUT);
+    attrset(A_NORMAL);
+}
+
 void loop() {
     int piece_idx = rand() % PIECES_NUM;
     int x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
@@ -361,6 +515,11 @@ int main(void) {
         printf("Window is too small!\n");
         return 1;
     }
+
+    init_editor_colors();
+    start_screen();
+    erase();
+    refresh();
 
     loop();
 
