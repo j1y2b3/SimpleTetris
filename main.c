@@ -12,6 +12,8 @@
 #define KEY_TIMEOUT 16
 #define DROP_INTERVAL 1
 
+#define BOARD_LEFT 1
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 int board[BOARD_HEIGHT][BOARD_WIDTH] = { 0 };
@@ -126,85 +128,174 @@ void del_row(int row) {
     }
 }
 
+// 判断方块能否放在 (x, y)：不越界且不与已有方块重叠
+int can_place(struct Piece* piece, int x, int y) {
+    for (int i = 0; i < piece->height; i++) {
+        for (int j = 0; j < piece->width; j++) {
+            if (!piece->shape[i][j]) continue;
+
+            int nx = x + j;
+            int ny = y + i;
+            if (nx < 0 || BOARD_WIDTH <= nx) return 0;
+            if (ny >= BOARD_HEIGHT) return 0;
+            if (ny >= 0 && board[ny][nx]) return 0;
+        }
+    }
+    return 1;
+}
+
+// 尝试将方块移动 (dx, dy)，成功返回 1
+int try_move(int piece_idx, int* x, int* y, int dx, int dy) {
+    put_piece(&pieces[piece_idx], *x, *y, 0);
+
+    if (can_place(&pieces[piece_idx], *x + dx, *y + dy)) {
+        *x += dx;
+        *y += dy;
+        put_piece(&pieces[piece_idx], *x, *y, 1);
+        return 1;
+    }
+
+    put_piece(&pieces[piece_idx], *x, *y, 1);
+    return 0;
+}
+
+// 尝试旋转方块，必要时左右平移一格让出空间，成功返回 1
+int try_rotate(int piece_idx, int* x, int* y) {
+    static const int kicks[] = { 0, -1, 1, -2, 2 };
+
+    struct Piece rotated = pieces[piece_idx];
+    rotate_piece(&rotated);
+
+    put_piece(&pieces[piece_idx], *x, *y, 0);
+
+    for (int i = 0; i < 5; i++) {
+        int nx = *x + kicks[i];
+        if (can_place(&rotated, nx, *y)) {
+            pieces[piece_idx] = rotated;
+            *x = nx;
+            put_piece(&pieces[piece_idx], *x, *y, 1);
+            return 1;
+        }
+    }
+
+    put_piece(&pieces[piece_idx], *x, *y, 1);
+    return 0;
+}
+
+// 消除所有满行
+void clear_full_rows() {
+    for (int i = BOARD_HEIGHT - 1; i >= 0; i--) {
+        int full = 1;
+        for (int j = 0; j < BOARD_WIDTH; j++) {
+            if (!board[i][j]) {
+                full = 0;
+                break;
+            }
+        }
+
+        if (full) {
+            del_row(i);
+            ++i; // 上面的行下移后，需要重新检查当前行
+        }
+    }
+}
+
+// 两侧竖栏
+void draw_borders() {
+    for (int i = 0; i < window_height; i++) {
+        mvaddch(i, BOARD_LEFT - 1, ACS_VLINE);
+        mvaddch(i, BOARD_LEFT + BOARD_WIDTH * 2, ACS_VLINE);
+    }
+}
+
 int display() {
     for (int i = 0; i < BOARD_HEIGHT; i++) {
         for (int j = 0; j < BOARD_WIDTH; j++) {
-            printf("%d ", board[i][j]); // DEBUG
-            if (!board[i][j]) continue;
-            if (mvaddch(i, j * 2 - 1, ' ' | A_REVERSE) == ERR) return ERR;
-            if (mvaddch(i, j * 2, ' ' | A_REVERSE) == ERR) return ERR;
+            chtype cell = board[i][j] ? (' ' | A_REVERSE) : ' ';
+
+            if (mvaddch(i, BOARD_LEFT + j * 2, cell) == ERR) return ERR;
+            if (mvaddch(i, BOARD_LEFT + j * 2 + 1, cell) == ERR) return ERR;
         }
-        printf("\n"); // DEBUG
     }
     refresh();
     return OK;
 }
 
 void loop() {
-    time_t cur_time = time(NULL);
+    int piece_idx = 0;
+    int x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
+    int y = 0;
+
+    put_piece(&pieces[piece_idx], x, y, 1);
+
     time_t last_time = time(NULL);
+
     while (1) {
         // 两侧竖栏
-        for (int i = 0; i < window_height; i++) {
-            mvaddch(i, 0, ACS_VLINE);
-            mvaddch(i, BOARD_WIDTH * 2 - 1, ACS_VLINE);
-        }
+        draw_borders();
 
         // 输入
         timeout(KEY_TIMEOUT);
         int input = getch();
-        if (input != ERR) {
-            ;
+        switch (input) {
+        case 'q':
+        case 'Q':
+        case 27: // ESC
+            put_piece(&pieces[piece_idx], x, y, 0);
+            return;
+        case KEY_LEFT:
+        case 'a':
+        case 'A':
+            try_move(piece_idx, &x, &y, -1, 0);
+            break;
+        case KEY_RIGHT:
+        case 'd':
+        case 'D':
+            try_move(piece_idx, &x, &y, 1, 0);
+            break;
+        case KEY_DOWN:
+        case 's':
+        case 'S':
+            if (try_move(piece_idx, &x, &y, 0, 1)) {
+                last_time = time(NULL); // 手动下落重置计时
+            }
+            break;
+        case KEY_UP:
+        case 'w':
+        case 'W':
+            try_rotate(piece_idx, &x, &y);
+            break;
+        default:
+            break;
         }
 
         // 下落
-        cur_time = time(NULL);
+        time_t cur_time = time(NULL);
         if (cur_time - last_time >= DROP_INTERVAL) {
             last_time = cur_time;
 
-            // 当前方块状态（静态变量只初始化一次）
-            static int cur_piece = 0; // 当前方块编号
-            static int cur_x = 2, cur_y = 2; // 左上角坐标
-            static int spawned = 0; // 是否已生成
+            if (!try_move(piece_idx, &x, &y, 0, 1)) {
+                // 无法下落：方块落地，消行后生成新方块
+                clear_full_rows();
 
-            if (!spawned) {
-                // 首次进入：在顶部生成方块
-                put_piece(&pieces[cur_piece], cur_x, cur_y, 1);
-                spawned = 1;
-            } else {
-                // 先擦除旧位置，再判断能否下移一格
-                put_piece(&pieces[cur_piece], cur_x, cur_y, 0);
+                piece_idx = (piece_idx + 1) % PIECES_NUM;
+                x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
+                y = 0;
 
-                int can_down = 1; // 假定可以下落
-                for (int i = 0; i < pieces[cur_piece].height; i++) {
-                    for (int j = 0; j < pieces[cur_piece].width; j++) {
-                        if (!pieces[cur_piece].shape[i][j]) continue; // 空格字不检查
-
-                        int nx = cur_x + j;
-                        int ny = cur_y + i + 1;
-                        // 越界或与已有方块重叠则不能下落
-                        if (nx < 0 || BOARD_WIDTH <= nx
-                            || ny < 0 || BOARD_HEIGHT <= ny
-                            || board[ny][nx]) {
-                            can_down = 0;
-                            break;
-                        }
-                    }
-                    if (!can_down) break;
+                // 新方块放不下则游戏结束
+                if (!can_place(&pieces[piece_idx], x, y)) {
+                    mvprintw(BOARD_HEIGHT / 2, BOARD_LEFT, "GAME OVER");
+                    mvprintw(BOARD_HEIGHT / 2 + 1, BOARD_LEFT, "Press any key...");
+                    refresh();
+                    timeout(-1);
+                    getch();
+                    return;
                 }
 
-                if (can_down) {
-                    ++cur_y;  // 下落一格
-                }
-                // 在（新或原）位置重新画出方块
-                put_piece(&pieces[cur_piece], cur_x, cur_y, 1);
+                put_piece(&pieces[piece_idx], x, y, 1);
+                last_time = time(NULL);
             }
         }
-
-
-
-
-
 
         // 显示
         display();
@@ -217,8 +308,15 @@ void loop() {
 
 int main(void) {
     // 初始化
-    read_pieces("pieces.txt");
+    if (read_pieces("pieces.txt") != OK) {
+        printf("Failed to read pieces.txt\n");
+        return 1;
+    }
+
     initscr();
+    noecho();
+    cbreak();
+    keypad(stdscr, TRUE);
     getmaxyx(stdscr, window_height, window_width);
 
     // 窗口大小不足退出
@@ -227,23 +325,8 @@ int main(void) {
         printf("Window is too small!\n");
         return 1;
     }
-    // 两侧竖栏
-    for (int i = 0; i < window_height; i++) {
-        mvaddch(i, 0, ACS_VLINE);
-        mvaddch(i, BOARD_WIDTH * 2 - 1, ACS_VLINE);
-    }
-    // 放块
-    put_piece(&pieces[0], 2, 2, 1);
-    // 删一行
-    del_row(3);
-    // 显示
-    display();
-    // 光标移至右下角
-    mvaddch(window_height - 1, window_width - 1, ' ');
-    // 刷新
-    refresh();
-    // 等待
-    getch();
+
+    loop();
 
     endwin();
     return 0;
