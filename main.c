@@ -163,9 +163,9 @@ void loop() {
             last_time = cur_time;
 
             // 当前方块状态（静态变量只初始化一次）
-            static int cur_piece = 0;
-            static int cur_x = 2, cur_y = 2;
-            static int spawned = 0;
+            static int cur_piece = 0; // 当前方块编号
+            static int cur_x = 2, cur_y = 2; // 左上角坐标
+            static int spawned = 0; // 是否已生成
 
             if (!spawned) {
                 // 首次进入：在顶部生成方块
@@ -175,17 +175,17 @@ void loop() {
                 // 先擦除旧位置，再判断能否下移一格
                 put_piece(&pieces[cur_piece], cur_x, cur_y, 0);
 
-                int can_down = 1;
+                int can_down = 1; // 假定可以下落
                 for (int i = 0; i < pieces[cur_piece].height; i++) {
                     for (int j = 0; j < pieces[cur_piece].width; j++) {
-                        if (!pieces[cur_piece].shape[i][j]) continue;
+                        if (!pieces[cur_piece].shape[i][j]) continue; // 空格字不检查
 
                         int nx = cur_x + j;
                         int ny = cur_y + i + 1;
                         // 越界或与已有方块重叠则不能下落
                         if (nx < 0 || BOARD_WIDTH <= nx
-                                || ny < 0 || BOARD_HEIGHT <= ny
-                                || board[ny][nx]) {
+                            || ny < 0 || BOARD_HEIGHT <= ny
+                            || board[ny][nx]) {
                             can_down = 0;
                             break;
                         }
@@ -200,7 +200,7 @@ void loop() {
                 put_piece(&pieces[cur_piece], cur_x, cur_y, 1);
             }
         }
-    
+
 
 
 
