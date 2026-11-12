@@ -1,12 +1,13 @@
 #include "PDCurses/curses.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #define BOARD_WIDTH 20
 #define BOARD_HEIGHT 20
 
-#define PIECES_NUM 1
+#define PIECES_NUM 7
 #define PIECE_MAX_SIZE 4
 
 #define KEY_TIMEOUT 16
@@ -226,7 +227,8 @@ int display() {
 }
 
 void loop() {
-    int piece_idx = 0;
+    int piece_idx=rand()%PIECES_NUM;
+    // int piece_idx = 0;
     int x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
     int y = 0;
 
@@ -316,7 +318,7 @@ int main(void) {
         printf("Failed to read pieces.txt\n");
         return 1;
     }
-
+    srand((unsigned)time(NULL));
     initscr();
     noecho();
     cbreak();
