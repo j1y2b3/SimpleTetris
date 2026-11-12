@@ -7,7 +7,7 @@
 #define BOARD_WIDTH 20
 #define BOARD_HEIGHT 20
 
-#define PIECES_NUM 7
+#define PIECES_NUM 8
 #define PIECE_MAX_SIZE 4
 
 #define KEY_TIMEOUT 16
@@ -227,8 +227,7 @@ int display() {
 }
 
 void loop() {
-    int piece_idx=rand()%PIECES_NUM;
-    // int piece_idx = 0;
+    int piece_idx = rand() % PIECES_NUM;
     int x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
     int y = 0;
 
@@ -284,7 +283,7 @@ void loop() {
                 // 无法下落：方块落地，消行后生成新方块
                 clear_full_rows();
 
-                piece_idx = (piece_idx + 1) % PIECES_NUM;
+                piece_idx = rand() % PIECES_NUM;
                 x = (BOARD_WIDTH - pieces[piece_idx].width) / 2;
                 y = 0;
 
